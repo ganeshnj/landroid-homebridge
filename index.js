@@ -126,6 +126,44 @@ class WorxPlatform {
     return uuid;
   }
 
+  async apiGet(path) {
+    const r = await fetch(`https://${this.cloud.api}${path}`, {
+      headers: { authorization: `Bearer ${this.session.access_token}`, accept: 'application/json' } });
+    let body = null; try { body = await r.json(); } catch { /* not JSON */ }
+    return { status: r.status, body };
+  }
+
+  // Zones come from the map's zone layers; each has a numeric summary.id, which is what the start command's cut.z list takes.
+  async fetchZones() {
+    const found = new Map();
+    const scan = (v) => {
+      if (Array.isArray(v)) return v.forEach(scan);
+      if (!v || typeof v !== 'object') return;
+      const sum = v.summary;
+      const isZone = String(v.type || (sum && sum.type) || '').toLowerCase() === 'zone';
+      if (isZone && sum && Number.isInteger(sum.id) && typeof v.name === 'string') found.set(sum.id, v.name);
+      Object.values(v).forEach(scan);
+    };
+    try {
+      for (const prefix of ['/api/v2', '/api/v1', '/api/v3', '']) {
+        const list = await this.apiGet(`${prefix}/maps`);
+        if (list.status !== 200) continue;
+        const maps = Array.isArray(list.body) ? list.body : (list.body && (list.body.data || list.body.maps)) || [];
+        const map = maps.find((m) => m && m.active) || maps[0];
+        if (!map || !map.id) { this.log.warn('No maps found on this account'); return []; }
+        for (const sub of ['/layers', '']) {
+          const res = await this.apiGet(`${prefix}/maps/${encodeURIComponent(map.id)}${sub}`);
+          if (res.status === 200) scan(res.body);
+          if (found.size) break;
+        }
+        break;
+      }
+    } catch (e) { this.log.warn(`Could not load zones: ${e.message}`); }
+    const zones = [...found].map(([id, name]) => ({ id, name }));
+    this.log.info(zones.length ? `Zones: ${zones.map((z) => `${z.name} (${z.id})`).join(', ')}` : 'No zones found; area selection disabled');
+    return zones;
+  }
+
   async addVacuumMower(item) {
     const matter = this.api.matter;
     if (!matter || !this.api.isMatterEnabled()) {
@@ -137,9 +175,12 @@ class WorxPlatform {
     const batt = (dat) => Math.min(100, Math.max(0, (dat.bt && dat.bt.p) || 0));
     const chargeState = (dat) => (dat.bt && dat.bt.c ? 1 : rvcState(dat) === 66 ? 2 : 3);
     let registered = false;
+    const zones = await this.fetchZones();
+    const zoneIds = new Set(zones.map((z) => z.id));
+    let selected = [];
 
-    const run = async (cmd, runMode, opState) => {
-      try { this.command(item, cmd); } catch (e) { throw new matter.status.Failure(e.message); }
+    const run = async (cmd, runMode, opState, extra) => {
+      try { this.command(item, cmd, extra); } catch (e) { throw new matter.status.Failure(e.message); }
       await matter.updateAccessoryState(uuid, 'rvcRunMode', { currentMode: runMode });
       await matter.updateAccessoryState(uuid, 'rvcOperationalState', { operationalState: opState });
     };
@@ -175,11 +216,19 @@ class WorxPlatform {
           batFunctionalWhileCharging: true,
           activeBatFaults: [], activeBatChargeFaults: [],
         },
+        ...(zones.length ? { serviceArea: {
+          supportedMaps: [{ mapId: 1, name: item.name || 'Lawn' }],
+          supportedAreas: zones.map((z) => ({
+            areaId: z.id, mapId: 1,
+            areaInfo: { locationInfo: { locationName: z.name, floorNumber: null, areaType: null }, landmarkInfo: null },
+          })),
+          selectedAreas: [], currentArea: null, estimatedEndTime: null,
+        } } : {}),
       },
       handlers: {
         rvcRunMode: {
           changeToMode: async ({ newMode }) => {
-            if (newMode === 1) return run(CMD.START, 1, 1);
+            if (newMode === 1) return run(CMD.START, 1, 1, selected.length ? { cut: { z: selected } } : undefined);
             if (newMode === 0) return run(CMD.HOME, 0, 64);
             throw new matter.status.ConstraintError(`Unsupported mode ${newMode}`);
           },
@@ -189,6 +238,16 @@ class WorxPlatform {
           resume: () => run(CMD.RESUME, 1, 1),
           goHome: () => run(CMD.HOME, 0, 64),
         },
+        ...(zones.length ? { serviceArea: {
+          selectAreas: async ({ newAreas }) => {
+            const bad = newAreas.filter((a) => !zoneIds.has(a));
+            if (bad.length) throw new matter.status.ConstraintError(`Unknown zone id ${bad.join(', ')}`);
+            selected = [...new Set(newAreas)];
+            this.log.info(selected.length ? `Zone selection: ${selected.map((id) => zones.find((z) => z.id === id).name).join(', ')}` : 'Zone selection cleared: whole lawn');
+            setImmediate(() => matter.updateAccessoryState(uuid, 'serviceArea', { selectedAreas: [...selected] })
+              .catch((e) => this.log.warn(`Could not store zone selection: ${e.message}`)));
+          },
+        } } : {}),
       },
     };
 
@@ -232,9 +291,9 @@ class WorxPlatform {
     this.client.on('error', (e) => this.log.warn(`MQTT error: ${e.message}`));
   }
 
-  command(item, cmd) {
-    this.log.info(`${item.name}: cmd ${cmd}`);
+  command(item, cmd, extra = {}) {
+    this.log.info(`${item.name}: cmd ${cmd}${extra.cut ? ` zones ${extra.cut.z}` : ''}`);
     if (!this.client || !this.client.connected) throw this.api.hap ? new this.api.hap.HapStatusError(-70402) : new Error('MQTT not connected');
-    this.client.publish(item.mqtt_topics.command_in, JSON.stringify({ cmd }), { qos: 1 });
+    this.client.publish(item.mqtt_topics.command_in, JSON.stringify({ cmd, ...extra }), { qos: 1 });
   }
 }
