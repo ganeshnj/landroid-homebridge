@@ -5,7 +5,20 @@
   "description": "Homebridge plugin for Worx Landroid mowers (cloud/MQTT).",
   "main": "index.js",
   "license": "MIT",
-  "engines": { "node": ">=18", "homebridge": ">=1.6.0" },
-  "keywords": ["homebridge-plugin", "worx", "landroid", "lawn mower"],
-  "dependencies": { "mqtt": "^5.10.0" }
+  "engines": {
+    "node": ">=18",
+    "homebridge": ">=1.6.0"
+  },
+  "keywords": [
+    "homebridge-plugin",
+    "worx",
+    "landroid",
+    "lawn mower"
+  ],
+  "dependencies": {
+    "mqtt": "^5.10.0"
+  },
+  "scripts": {
+    "test": "node --check index.js && node -e \"JSON.parse(require('fs').readFileSync('config.schema.json'));require('./index.js')\""
+  }
 }
