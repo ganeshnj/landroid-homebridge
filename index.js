@@ -10,7 +10,7 @@ const CLOUDS = {
 const REFRESH_SCOPE = 'user:profile mower:firmware mower:view mower:pair user:manage mower:update mower:activity_log user:certificate data:products mower:unpair mower:warranty mobile:notifications mower:lawn';
 // dat.ls status codes that mean "actively mowing / working"
 const WORKING = new Set([2, 3, 4, 5, 6, 7, 12, 30, 31, 32]);
-const CMD = { START: 1, STOP: 2, HOME: 3 };
+const CMD = { START: 1, STOP: 2, HOME: 3, START_ONCE: 10, RESUME: 102 }; // ids from the Worx app's command enum
 const PLUGIN_NAME = 'homebridge-worx-landroid-local';
 const PLATFORM_NAME = 'WorxLandroid';
 
@@ -186,7 +186,7 @@ class WorxPlatform {
         },
         rvcOperationalState: {
           pause: () => run(CMD.STOP, 1, 2),
-          resume: () => run(CMD.START, 1, 1),
+          resume: () => run(CMD.RESUME, 1, 1),
           goHome: () => run(CMD.HOME, 0, 64),
         },
       },
