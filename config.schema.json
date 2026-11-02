@@ -1,0 +1,16 @@
+{
+  "pluginAlias": "WorxLandroid",
+  "pluginType": "platform",
+  "singular": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": { "title": "Name", "type": "string", "default": "Worx Landroid" },
+      "email": { "title": "Worx account email", "type": "string", "required": true },
+      "password": { "title": "Password", "type": "string", "required": true },
+      "server": { "title": "Brand", "type": "string", "default": "worx", "oneOf": [
+        { "title": "Worx", "enum": ["worx"] }, { "title": "Kress", "enum": ["kress"] },
+        { "title": "Landxcape", "enum": ["landxcape"] }, { "title": "Ferrex", "enum": ["ferrex"] } ] }
+    }
+  }
+}
