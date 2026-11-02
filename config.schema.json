@@ -7,7 +7,10 @@
     "properties": {
       "name": { "title": "Name", "type": "string", "default": "Worx Landroid" },
       "email": { "title": "Worx account email", "type": "string", "required": true },
-      "password": { "title": "Password", "type": "string", "required": true },
+      "password": { "title": "Password", "type": "string", "required": true, "format": "password" },
+      "mode": { "title": "Show mower as", "type": "string", "default": "switch", "oneOf": [
+        { "title": "HomeKit switch + battery", "enum": ["switch"] },
+        { "title": "Matter robot vacuum (Homebridge 2+)", "enum": ["vacuum"] } ] },
       "server": { "title": "Brand", "type": "string", "default": "worx", "oneOf": [
         { "title": "Worx", "enum": ["worx"] }, { "title": "Kress", "enum": ["kress"] },
         { "title": "Landxcape", "enum": ["landxcape"] }, { "title": "Ferrex", "enum": ["ferrex"] } ] }

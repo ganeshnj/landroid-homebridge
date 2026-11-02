@@ -44,6 +44,11 @@ Restart Homebridge, then configure the plugin in the UI.
 | `email`    | Worx account email (required)                                        |
 | `password` | Worx account password (required)                                     |
 | `server`   | `worx` (default), `kress`, `landxcape` or `ferrex`                   |
+| `mode`     | `switch` (default) or `vacuum` (Matter robot vacuum, Homebridge 2+)  |
+
+## Matter robot vacuum mode (experimental)
+
+Matter has no lawn-mower device type, so with `"mode": "vacuum"` the mower is published as a **Robotic Vacuum Cleaner** (start, pause, return to dock, battery). This needs Homebridge 2+ with Matter enabled for the plugin's child bridge. Apple Home won't pair a robot vacuum that shares a bridge with other devices, so pair it on its own via the plugin's *External Accessories* Matter QR code. See [homebridge-mova](https://github.com/Gh0str1s3n/homebridge-mova#readme) for a working example of the same setup. Without Matter, the plugin falls back to the switch.
 
 ## How it works
 
